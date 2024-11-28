@@ -7,12 +7,7 @@ from carregar_imagens import load_image
 
 class SquareAttack:
     def __init__(self, eps, n_iters, initial_p, num_squares):
-        """
-        :param eps: Intensidade máxima da perturbação.
-        :param n_iters: Número de iterações do ataque.
-        :param initial_p: Proporção inicial da área perturbada.
-        :param num_squares: Número de quadrados aplicados por iteração.
-        """
+     
         self.eps = eps
         self.n_iters = n_iters
         self.initial_p = initial_p
@@ -46,29 +41,26 @@ class SquareAttack:
     def apply(self, image, send_image_to_server, server_url):
         """Aplica o Square Attack diretamente na matriz de pixels."""
         width, height = image.size
-        perturbed_image = np.array(image, dtype=np.float32) / 255.0  # Normalizar para [0, 1]
+        perturbed_image = np.array(image, dtype=np.float32) / 255.0 
         p_init = self.initial_p
         n_features = width * height
 
         for it in range(self.n_iters):
             p = self.p_selection(p_init, it, self.n_iters)
-            s = int(round(np.sqrt(p * n_features) * 0.5))  # Tamanho do quadrado
-            s = max(1, min(s, min(width, height) - 1))  # Ajusta limites
+            s = int(round(np.sqrt(p * n_features) * 0.5))  
+            s = max(1, min(s, min(width, height) - 1))  
 
             for _ in range(self.num_squares):
-                # Garantir que o quadrado se encaixe na imagem
+                
                 x = random.randint(0, width - s)
                 y = random.randint(0, height - s)
 
-                # Gerar perturbação aleatória multiplicativa
                 perturbation = np.random.uniform(1 - self.eps, 1 + self.eps, (s, s, 3))
 
-                # Multiplicar a região da imagem pela perturbação
                 perturbed_image[y:y + s, x:x + s] *= perturbation
 
-            perturbed_image = np.clip(perturbed_image, 0, 1)  # Garantir valores válidos [0, 1]
-
-            # Enviar imagem perturbada para o servidor
+            perturbed_image = np.clip(perturbed_image, 0, 1) 
+            
             perturbed_image_uint8 = (perturbed_image * 255).astype(np.uint8)
             perturbed_pil_image = Image.fromarray(perturbed_image_uint8)
 
@@ -80,7 +72,6 @@ class SquareAttack:
                 print(f"Erro ao enviar imagem na iteração {it + 1}: {e}")
                 continue
 
-            # Verificar a resposta do servidor
             if response:
                 predicted_class = response.get("class")
                 confidence = response.get("confidence")
@@ -98,7 +89,6 @@ class SquareAttack:
         print("Imagem final salva como 'failed_attack_image.jpg'.")
         return final_image
 
-# Exemplo de uso
 if __name__ == "__main__":
     from carregar_imagens import load_image
     from server_connection import send_image_to_server
