@@ -1,14 +1,16 @@
+import os
 import numpy as np
-from PIL import Image
 import random
-
+from PIL import Image
+from server_connection import send_image_to_server
+from carregar_imagens import load_image
 
 class SquareAttack:
     def __init__(self, eps, n_iters, initial_p, num_squares):
         """
         :param eps: Intensidade máxima da perturbação.
         :param n_iters: Número de iterações do ataque.
-        :param initial_p: Tamanho inicial do quadrado como proporção da imagem.
+        :param initial_p: Proporção inicial da área perturbada.
         :param num_squares: Número de quadrados aplicados por iteração.
         """
         self.eps = eps
@@ -16,9 +18,30 @@ class SquareAttack:
         self.initial_p = initial_p
         self.num_squares = num_squares
 
+        os.makedirs("imagens_perturbadas", exist_ok=True)
+
     def p_selection(self, p_init, it, n_iters):
-        """Reduz gradualmente o tamanho do quadrado ao longo das iterações."""
-        return p_init * (1 - it / n_iters)
+        it = int(it / n_iters * 10000)
+        if 10 < it <= 50:
+            return p_init / 2
+        elif 50 < it <= 200:
+            return p_init / 4
+        elif 200 < it <= 500:
+            return p_init / 8
+        elif 500 < it <= 1000:
+            return p_init / 16
+        elif 1000 < it <= 2000:
+            return p_init / 32
+        elif 2000 < it <= 4000:
+            return p_init / 64
+        elif 4000 < it <= 6000:
+            return p_init / 128
+        elif 6000 < it <= 8000:
+            return p_init / 256
+        elif 8000 < it <= 10000:
+            return p_init / 512
+        else:
+            return p_init
 
     def apply(self, image, send_image_to_server, server_url):
         """Aplica o Square Attack diretamente na matriz de pixels."""
@@ -29,11 +52,11 @@ class SquareAttack:
 
         for it in range(self.n_iters):
             p = self.p_selection(p_init, it, self.n_iters)
-            s = int(round(np.sqrt(p * n_features)))
-            s = max(5, min(s, min(width, height) - 1))  # Limitar tamanho do quadrado
+            s = int(round(np.sqrt(p * n_features) * 0.5))  # Tamanho do quadrado
+            s = max(1, min(s, min(width, height) - 1))  # Ajusta limites
 
             for _ in range(self.num_squares):
-                # Escolher aleatoriamente a posição do quadrado
+                # Garantir que o quadrado se encaixe na imagem
                 x = random.randint(0, width - s)
                 y = random.randint(0, height - s)
 
@@ -48,6 +71,8 @@ class SquareAttack:
             # Enviar imagem perturbada para o servidor
             perturbed_image_uint8 = (perturbed_image * 255).astype(np.uint8)
             perturbed_pil_image = Image.fromarray(perturbed_image_uint8)
+
+            perturbed_pil_image.save(f"imagens_perturbadas/iter_{it + 1}.jpg")
 
             try:
                 response = send_image_to_server(perturbed_pil_image, server_url)
@@ -73,7 +98,6 @@ class SquareAttack:
         print("Imagem final salva como 'failed_attack_image.jpg'.")
         return final_image
 
-
 # Exemplo de uso
 if __name__ == "__main__":
     from carregar_imagens import load_image
@@ -83,6 +107,5 @@ if __name__ == "__main__":
     reprovado_img = load_image("./reprovado.jpg")
 
     if reprovado_img:
-        square_attack = SquareAttack(eps=0.1, n_iters=15, initial_p=0.3, num_squares=5)
+        square_attack = SquareAttack(eps=0.2, n_iters=200, initial_p=0.45, num_squares=9)
         adversarial_image = square_attack.apply(reprovado_img, send_image_to_server, server_url)
-        
